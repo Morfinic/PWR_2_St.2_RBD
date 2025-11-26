@@ -1,6 +1,106 @@
 ﻿@page "/uzytkownicy"
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore;
+@using Oracle.ManagedDataAccess.Client
+@using RozproszneBazyDanych.Components.Models
+@inject Models.AppDbContext DbContext;
+
+@code {
+    private List<Models.User_View> UserList;
+    private NewUser newUser = new NewUser();
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        UserList = await DbContext.User_View.ToListAsync();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            var pUsername = new OracleParameter("p_username", newUser.Username);
+            var pRole = new OracleParameter("p_role", newUser.User_Role);
+            var pEmail = new OracleParameter("p_email", newUser.Email);
+            var pPassword = new OracleParameter("p_password", newUser.Password);
+
+            const string sql = "BEGIN add_user(:p_username, :p_role, :p_email, :p_password); END;";
+
+            await DbContext.Database.ExecuteSqlRawAsync(sql, pUsername, pRole, pEmail, pPassword);
+
+            message = "Użytkownik dodany.";
+
+            newUser = new NewUser();
+            await LoadUserData();
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas dodawnia: {ex.Message}";
+        }
+    }
+}
 
 <PageTitle>Uzytkownicy</PageTitle>
 
-Uzytkownicy
+<h3>Dodaj użytkownika</h3>
+<EditForm Model="@newUser" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+    
+    <div class="mb-3">
+        <label>Nazwa użytkownika:</label>
+        <InputText @bind-Value="newUser.Username" class="form-control"/>
+    </div>
+
+    <div class="mb-3">
+        <label>Rola:</label>
+        <InputSelect @bind-Value="newUser.User_Role" class="form-control">
+            <option value="">Wybierz rolę</option>
+            <option value="Admin">Admin</option>
+            <option value="Guest">Guest</option>
+        </InputSelect>
+        <ValidationMessage For="@(() => newUser.User_Role)"/>
+    </div>
+
+    <div class="mb-3">
+        <label>Email:</label>
+        <InputText @bind-Value="newUser.Email" class="form-control"/>
+    </div>
+
+    <div class="mb-3">
+        <label>Hasło:</label>
+        <InputText @bind-Value="newUser.Password" class="form-control"/>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Zapisz</button>
+</EditForm>
+
+@if (message != null)
+{
+    <div class="alert alert-info mt-3">@message</div>
+}
+
+<hr/>
+<h3>Lista użytkowników</h3>
+
+@if (UserList == null)
+{
+    <p><em>Ładowanie danych ...</em></p>
+}
+else
+{
+    @foreach (var user in UserList)
+    {
+        <div class="user-card" style="border:1px solid #ccc2a4; padding:10px; margin:5px;">
+            <strong>@user.Username</strong> |
+            @user.UserRole |
+            @user.Email |
+            @user.Password
+        </div>
+    }
+}

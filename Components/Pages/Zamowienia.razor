@@ -1,6 +1,122 @@
 ﻿@page "/zamowienia"
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore;
+@using RozproszneBazyDanych.Components.Models
+@using Oracle.ManagedDataAccess.Client
+@inject Models.AppDbContext DbContext;
+
+@code {
+    private List<Models.Zamowienia> orderList;
+    private string message;
+    private NewZamowienie newZamowienie = new NewZamowienie();
+    
+    private List<Models.Produkty> productList = new List<Models.Produkty>();
+    private List<Models.User_View> userList = new List<User_View>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadZamowienia();
+        productList = await DbContext.Produkty.ToListAsync();
+        userList = await DbContext.User_View.ToListAsync();
+    }
+    
+    private async Task LoadZamowienia()
+    {
+        orderList = await DbContext.Zamowienia.ToListAsync();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            var p_User = new OracleParameter("p_user", newZamowienie.IdUzytkownika);
+            var pProdukt = new OracleParameter("p_produkt", newZamowienie.IdProduktu);
+            
+            const string sql = "BEGIN add_order(:p_user, :p_produkt); END;";
+
+            await DbContext.Database.ExecuteSqlRawAsync(sql, p_User, pProdukt);
+
+            message = "Produkt przyjęty w magazynie.";
+
+            newZamowienie = new NewZamowienie();
+            await LoadZamowienia();
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas dodawnia: {ex.Message}";
+        }
+    }
+
+}
 
 <PageTitle>Zamówienia</PageTitle>
 
-Zamówienia
+<h3>Dodaj zamówienie</h3>
+
+<EditForm Model="@newZamowienie" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label>Produkt:</label>
+        <InputSelect @bind-value="newZamowienie.IdProduktu" class="form-select">
+            @if (productList == null)
+            {
+                <option value="0">Ładowanie produktów...</option>
+            }
+            else
+            {
+                <option value="0">-- Wybierz produkt --</option>
+                @foreach (var prod in productList)
+                {
+                    <option value="@prod.PID">@prod.Nazwa</option>
+                }
+            }
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <label>Użytkownik:</label>
+        <InputSelect @bind-value="newZamowienie.IdUzytkownika" class="form-select">
+            @if (userList == null)
+            {
+                <option value="0">Ładowanie użytkowników...</option>
+            }
+            else
+            {
+                <option value="0">-- Wybierz użytkownika --</option>
+                @foreach (var user in userList)
+                {
+                    <option value="@user.UserId">@user.Username</option>
+                }
+            }
+        </InputSelect>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Zapisz</button>
+</EditForm>
+
+@if (message != null)
+{
+    <div class="alert alert-info mt-3">@message</div>
+}
+
+<hr/>
+<h3>Zamówienia</h3>
+
+@if (orderList == null)
+{
+    <p><em>Ładowanie danych ...</em></p>
+}
+else
+{
+    @foreach (var order in orderList)
+    {
+        <div class="user-card" style="border:1px solid #ccc2a4; padding:10px; margin:5px;">
+            <strong>@order.Nazwa_Produktu</strong> |
+            @order.Nazwa_Uzytkownika |
+            @order.Order_Status |
+            @order.Data_Utworzenia
+        </div>
+    }
+}

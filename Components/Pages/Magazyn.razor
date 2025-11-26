@@ -1,6 +1,113 @@
 ﻿@page "/magazyn"
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore;
+@using RozproszneBazyDanych.Components.Models
+@using Oracle.ManagedDataAccess.Client
+@inject Models.AppDbContext DbContext;
+
+@code {
+    private List<Models.Magazyn> magazynStock;
+    private List<Models.Produkty> productList = new List<Models.Produkty>();
+    private NewMagazyn newMagazyn = new NewMagazyn();
+
+    private string message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMagazyn();
+        productList = await DbContext.Produkty.ToListAsync();
+    }
+    
+    private async Task LoadMagazyn()
+    {
+        magazynStock = await DbContext.Global_Magazyn.ToListAsync();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            var pMagazyn = new OracleParameter("p_username", newMagazyn.NodeId);
+            var pProdukt = new OracleParameter("p_role", newMagazyn.NazwaProduktu);
+            var pIlosc = new OracleParameter("p_email", newMagazyn.Ilosc);
+
+            const string sql = "BEGIN add_to_magazyn(:p_username, :p_role, :p_email); END;";
+
+            await DbContext.Database.ExecuteSqlRawAsync(sql, pMagazyn, pProdukt, pIlosc);
+
+            message = "Produkt przyjęty w magazynie.";
+
+            newMagazyn = new NewMagazyn();
+            await LoadMagazyn();
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas dodawnia: {ex.Message}";
+        }
+    }
+}
 
 <PageTitle>Magazyn</PageTitle>
 
-Magazyn
+<h3>Dodaj towar do magazynu</h3>
+<EditForm Model="@newMagazyn" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label>Magazyn docelowy:</label>
+        <InputSelect @bind-value="newMagazyn.NodeId" class="form-select">
+            <option value="LOK1">LOK1</option>
+            <option value="LOK2">LOK2</option>
+        </InputSelect>
+    </div>
+    
+    <div class="mb-3">
+        <label>Produkt:</label>
+        <InputSelect @bind-value="newMagazyn.NazwaProduktu" class="form-select">
+            @if (productList == null)
+            {
+                <option value="0">Ładowanie produktów...</option>
+            }
+            else
+            {
+                <option value="0">-- Wybierz produkt --</option>
+                @foreach (var prod in productList)
+                {
+                    <option value="@prod.PID">@prod.Nazwa</option>
+                }
+            }
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Ilość:</label>
+        <InputNumber @bind-Value="newMagazyn.Ilosc" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Zapisz</button>
+</EditForm>
+
+@if (message != null)
+{
+    <div class="alert alert-info mt-3">@message</div>
+}
+
+<hr/>
+<h3>Stan magazynów</h3>
+
+@if (magazynStock == null)
+{
+    <p><em>Ładowanie danych ...</em></p>
+}
+else
+{
+    @foreach (var wpis in magazynStock)
+    {
+        <div class="user-card" style="border:1px solid #ccc2a4; padding:10px; margin:5px;">
+            <strong>@wpis.NodeId</strong> |
+            @wpis.NazwaProduktu |
+            @wpis.Ilosc
+        </div>
+    }
+}

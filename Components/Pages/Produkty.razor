@@ -1,6 +1,93 @@
 ﻿@page "/produkty"
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore;
+@using Oracle.ManagedDataAccess.Client
+@using RozproszneBazyDanych.Components.Models
+@inject Models.AppDbContext DbContext;
+
+@code {
+    private List<Models.Produkty>? ProduktyList;
+    private NewProdukt newProdukt = new NewProdukt();
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduktData();
+    }
+
+    private async Task LoadProduktData()
+    {
+        ProduktyList = await DbContext.Produkty.ToListAsync();
+    }
+    
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            var pNazwa = new OracleParameter("p_nazwa", newProdukt.Nazwa);
+            var pCena = new OracleParameter("p_cena", newProdukt.Cena);
+            var pKategoria = new OracleParameter("p_kategoria", newProdukt.Kategoria);
+
+            const string sql = "INSERT INTO PRODUKTY(NAZWA, CENA, KATEGORIA) VALUES (:p_nazwa, :p_cena, :p_kategoria)";
+            await DbContext.Database.ExecuteSqlRawAsync(sql, pNazwa, pCena, pKategoria);
+
+            message = "Produkt dodany.";
+
+            newProdukt = new NewProdukt();
+            await LoadProduktData();
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas dodawnia: {ex.Message}";
+        }
+    }
+}
 
 <PageTitle>Produkty</PageTitle>
 
-Produkty
+<h3>Dodaj produkt</h3>
+<EditForm Model="@newProdukt" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label>Nazwa produktu:</label>
+        <InputText @bind-Value="newProdukt.Nazwa" class="form-control"/>
+    </div>
+
+    <div class="mb-3">
+        <label>Cena:</label>
+        <InputNumber @bind-Value="newProdukt.Cena" step="0.01" class="form-control"/>
+    </div>
+
+    <div class="mb-3">
+        <label>Kategoria:</label>
+        <InputText @bind-Value="newProdukt.Kategoria" class="form-control"/>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Zapisz</button>
+</EditForm>
+
+@if (message != null)
+{
+    <div class="alert alert-info mt-3">@message</div>
+}
+
+<hr/>
+<h3>Lista produktów</h3>
+
+@if (ProduktyList == null)
+{
+    <p><em>Ładowanie danych ...</em></p>
+}
+else
+{
+    @foreach (var produkt in ProduktyList)
+    {
+        <div class="user-card" style="border:1px solid #ccc2a4; padding:10px; margin:5px;">
+            <strong>@produkt.Nazwa</strong> |
+            @produkt.Cena zł |
+            @produkt.Kategoria
+        </div>
+    }
+}

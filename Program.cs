@@ -1,9 +1,16 @@
 using RozproszneBazyDanych.Components;
+using RozproszneBazyDanych.Components.Models;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("OracleDb");
+
 // Add services to the container.
-builder.Services.AddRazorComponents()
+builder.Services.AddDbContext<AppDbContext>(
+        options => options.UseOracle(connectionString)
+    )
+    .AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
